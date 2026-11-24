@@ -169,7 +169,7 @@
             </div>
 
             <!-- Insert Reference Image Button -->
-            <button onclick="triggerReferenceImageSelect()" class="px-3 py-2 text-xs font-medium text-indigo-300 bg-indigo-950/60 hover:bg-indigo-900/60 border border-indigo-700/60 rounded-lg transition flex items-center gap-1.5" title="Insert reference background image">
+            <button onclick="triggerReferenceImageSelect()" ondragover="event.preventDefault(); this.classList.add('border-green-500')" ondragleave="this.classList.remove('border-green-500')" ondrop="this.classList.remove('border-green-500'); handleReferenceImageDrop(event)" class="px-3 py-2 text-xs font-medium text-indigo-300 bg-indigo-950/60 hover:bg-indigo-900/60 border border-indigo-700/60 rounded-lg transition flex items-center gap-1.5" title="Insert reference background image">
                 <i data-lucide="image-plus" class="w-3.5 h-3.5 text-indigo-400"></i> + Reference Image
             </button>
             <input type="file" id="refFileInput" accept="image/*" onchange="handleReferenceImageUpload(event)" class="hidden">
@@ -992,6 +992,21 @@
                     // Silently ignore non-MOSS PNGs when inserting as reference image
                 }
             }
+        };
+
+        // drag and drop support
+        window.handleReferenceImageDrop = function(event) {
+            event.preventDefault();
+            const file = event.dataTransfer.files[0];
+            if (!file || (file.type && !file.type.startsWith('image/'))) {
+                return;
+            }
+            // Pass the dropped file through the existing upload handler
+            window.handleReferenceImageUpload({
+                target: {
+                    files: [file]
+                }
+            });
         };
 
         window.updateRefOpacity = function(val) {
