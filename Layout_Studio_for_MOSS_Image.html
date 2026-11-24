@@ -316,17 +316,23 @@
                     <div class="grid grid-cols-2 gap-3">
                         <div>
                             <label class="block text-xs font-semibold text-slate-300 mb-1">Canvas Width (px)</label>
-                            <input type="number" id="canvasWidth" value="1024" step="16" min="128" max="4096" oninput="handleManualDimensionInput()" onchange="validateCanvasSize(); updateCanvasDimensions(); pushState();" class="w-full bg-slate-950 border border-slate-700/80 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
+                            <input type="number" id="canvasWidth" value="1024" step="16" min="128" max="4096" oninput="handleManualDimensionInput(); updateCanvasMP()" onchange="validateCanvasSize(); updateCanvasDimensions(); pushState();" class="w-full bg-slate-950 border border-slate-700/80 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-slate-300 mb-1">Canvas Height (px)</label>
-                            <input type="number" id="canvasHeight" value="1024" step="16" min="128" max="4096" oninput="handleManualDimensionInput()" onchange="validateCanvasSize(); updateCanvasDimensions(); pushState();" class="w-full bg-slate-950 border border-slate-700/80 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
+                            <input type="number" id="canvasHeight" value="1024" step="16" min="128" max="4096" oninput="handleManualDimensionInput(); updateCanvasMP()" onchange="validateCanvasSize(); updateCanvasDimensions(); pushState();" class="w-full bg-slate-950 border border-slate-700/80 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
                         </div>
                     </div>
 
                     <!-- Enforced Dimensions Notice -->
                     <div class="text-[0.5625rem] text-amber-400/90 flex items-center gap-1 pt-0.5">
                         <i data-lucide="info" class="w-3 h-3 shrink-0"></i> Dimensions are automatically enforced to multiples of 16. Be sure to generate using these exact dimensions.
+                    </div>
+
+                    <!-- show me the megapixels! -->
+                    <div class="mt-2 flex items-center text-xs">
+                        <span class="text-slate-400">Canvas Resolution: </span>
+                        <span id="canvasMP" class="font-semibold text-indigo-300"></span>
                     </div>
 
                     <!-- Presets vs Custom Mode Radio Buttons -->
@@ -1730,6 +1736,19 @@
 
             col1.innerHTML = renderButtons(col1Ratios);
             col2.innerHTML = renderButtons(col2Ratios);
+        };
+        // megapixel calc
+        window.updateCanvasMP = function() {
+            const width = Number(document.getElementById('canvasWidth').value);
+            const height = Number(document.getElementById('canvasHeight').value);
+            const output = document.getElementById('canvasMP');
+            if (!output) return;
+            if (width > 0 && height > 0) {
+                const megapixels = (width * height) / 1000000;
+                output.textContent = `${megapixels.toFixed(2)} MP`;
+            } else {
+                output.textContent = '-- MP';
+            }
         };
 
         window.handleSizeModeChange = function(mode) {
@@ -3161,6 +3180,8 @@
 
             window.initIcons();
         };
+        // init megapixel readout
+        // window.updateCanvasMP();
     </script>
 </body>
 </html>
