@@ -51,9 +51,9 @@
             }
         }
 
-        /* Functional 16x16 grid background */
+        /* Dynamic pixel grid background */
         .bg-grid-pattern {
-            background-size: 16px 16px;
+            background-size: var(--grid-size-x, 16px) var(--grid-size-y, 16px);
             background-image:
                 linear-gradient(to right, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
                 linear-gradient(to bottom, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
@@ -191,6 +191,17 @@
             <button id="snapGridBtn" onclick="toggleSnapToGrid()" class="px-3 py-2 text-xs font-medium text-indigo-300 bg-indigo-950/60 hover:bg-indigo-900/60 border border-indigo-700/60 rounded-lg transition flex items-center gap-1.5" title="Toggle 16px Grid Snapping">
                 <i data-lucide="grid" class="w-3.5 h-3.5 text-indigo-400"></i> Snap Grid: <span id="snapGridLabel">ON</span>
             </button>
+            <!-- Grid Size Selector -->
+            <select id="gridSizeSelect" onchange="changeGridSize(this.value)"
+                class="px-3 py-2 text-xs font-medium text-indigo-300 bg-indigo-950/60 hover:bg-indigo-900/60 border border-indigo-700/60 rounded-lg transition"
+                title="Set grid spacing in image pixels">
+                <option value="8">8 px Grid</option>
+                <option value="10">10 px Grid</option>
+                <option value="16" selected>16 px Grid</option>
+                <option value="32">32 px Grid</option>
+                <option value="64">64 px Grid</option>
+                <option value="128">128 px Grid</option>
+            </select>
 
             <!-- Reset Button -->
             <button id="resetBtn" onclick="resetAll()" title="Reset the Studio settings to default" class="px-3 py-2 text-xs font-medium text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-lg transition border border-slate-700 flex items-center gap-1.5">
@@ -617,8 +628,14 @@
                 <div>
                     <h4 class="font-bold text-indigo-400 uppercase tracking-wider text-[0.6875rem] mb-2">Fine-Tuning Box Positions</h4>
                     <div class="space-y-1.5 font-mono text-slate-300">
-                        <div class="flex justify-between bg-slate-950 px-2.5 py-1 rounded border border-slate-800"><span>Arrow Keys</span><span class="text-slate-400 font-sans">Nudge by 10px</span></div>
-                        <div class="flex justify-between bg-slate-950 px-2.5 py-1 rounded border border-slate-800"><span>Shift + Arrow Keys</span><span class="text-slate-400 font-sans">Nudge by 50px</span></div>
+                        <div class="flex justify-between bg-slate-950 px-2.5 py-1 rounded border border-slate-800">
+                            <span>Arrow Keys</span>
+                            <span id="nudgeStepLabel" class="text-slate-400 font-sans">Nudge by 16px</span>
+                        </div>
+                        <div class="flex justify-between bg-slate-950 px-2.5 py-1 rounded border border-slate-800">
+                            <span>Shift + Arrow Keys</span>
+                            <span id="nudgeShiftStepLabel" class="text-slate-400 font-sans">Nudge by 64px</span>
+                        </div>
                         <div class="flex justify-between bg-slate-950 px-2.5 py-1 rounded border border-slate-800"><span>Alt/Option + Arrow Keys</span><span class="text-slate-400 font-sans">Resize box</span></div>
                     </div>
                 </div>
@@ -826,6 +843,7 @@
         const STORAGE_KEY = 'moss_canvas_state';
         const textareaHeights = {};
         let enableGridSnap = true;
+        let gridSize = 16;
         let activeTab = 1;
         let activeBoxId = null;
         let isDragging = false;
@@ -1888,6 +1906,31 @@
             }
         };
 
+        // grid size functions
+        window.changeGridSize = function(value) {
+            const size = Number(value);
+            if (![8, 10, 16, 32, 64, 128].includes(size)) return;
+            gridSize = size;
+            window.updateNudgeHelpText();
+            window.updateGridDisplay();
+        };
+        // update the labels
+        window.updateNudgeHelpText = function() {
+            const normalLabel = document.getElementById('nudgeStepLabel');
+            const shiftLabel = document.getElementById('nudgeShiftStepLabel');
+            if (normalLabel) normalLabel.textContent = `Nudge by ${gridSize}px`;
+            if (shiftLabel) shiftLabel.textContent = `Nudge by ${gridSize * 4}px`;
+        };
+
+        window.updateGridDisplay = function() {
+            const wrapper = document.getElementById('canvasWrapper');
+            if (!wrapper) return;
+            const scaleX = wrapper.clientWidth / canvasState.width;
+            const scaleY = wrapper.clientHeight / canvasState.height;
+            wrapper.style.setProperty('--grid-size-x', `${gridSize * scaleX}px`);
+            wrapper.style.setProperty('--grid-size-y', `${gridSize * scaleY}px`);
+        };
+
         window.toggleMetaTag = function(tag) {
             window.pushState();
             const idx = canvasState.meta.indexOf(tag);
@@ -2298,6 +2341,8 @@
 
             wrapper.style.width = displayW + 'px';
             wrapper.style.height = displayH + 'px';
+            // Update the visual grid when the canvas changes size
+            window.updateGridDisplay();
 
             const indicator = document.getElementById('canvasAspectLabel');
             if (indicator) {
@@ -2552,52 +2597,46 @@
             window.addEventListener('mouseup', stopBoxDrag);
         };
 
-        function snap16(val) {
+        function snapToGrid(val, axis) {
             if (!enableGridSnap) return val;
-            return Math.round(val / 16) * 16;
+            const dimension = axis === 'x' ? canvasState.width : canvasState.height;
+            const pixelPosition = ((val + 500) / 1000) * dimension;
+            return (Math.round(pixelPosition / gridSize) * gridSize / dimension) * 1000 - 500;
         }
 
         function handleBoxDrag(e) {
             if (!isDragging || !activeBoxId) return;
-
             const wrapper = document.getElementById('canvasWrapper');
             const cWidth = wrapper.clientWidth;
             const cHeight = wrapper.clientHeight;
-
             const deltaX = e.clientX - dragStartX;
             const deltaY = e.clientY - dragStartY;
-
             const coordDeltaX = Math.round((deltaX / cWidth) * 1000);
             const coordDeltaY = Math.round((deltaY / cHeight) * 1000);
-
             const box = canvasState.boxes.find(b => b.id === activeBoxId);
             if (!box) return;
-
             if (dragMode === 'move') {
-                const width = initialBoxCoords.xmax - initialBoxCoords.xmin;
-                const height = initialBoxCoords.ymax - initialBoxCoords.ymin;
+                box.xmin = snapToGrid(initialBoxCoords.xmin + coordDeltaX, 'x');
+                box.ymin = snapToGrid(initialBoxCoords.ymin + coordDeltaY, 'y');
+                box.xmax = snapToGrid(initialBoxCoords.xmax + coordDeltaX, 'x');
+                box.ymax = snapToGrid(initialBoxCoords.ymax + coordDeltaY, 'y');
 
-                let rawXmin = initialBoxCoords.xmin + coordDeltaX;
-                let rawYmin = initialBoxCoords.ymin + coordDeltaY;
-
-                box.xmin = snap16(rawXmin);
-                box.ymin = snap16(rawYmin);
-                box.xmax = box.xmin + width;
-                box.ymax = box.ymin + height;
             } else if (dragMode === 'se') {
-                box.xmax = snap16(initialBoxCoords.xmax + coordDeltaX);
-                box.ymax = snap16(initialBoxCoords.ymax + coordDeltaY);
-            } else if (dragMode === 'nw') {
-                box.xmin = snap16(initialBoxCoords.xmin + coordDeltaX);
-                box.ymin = snap16(initialBoxCoords.ymin + coordDeltaY);
-            } else if (dragMode === 'ne') {
-                box.xmax = snap16(initialBoxCoords.xmax + coordDeltaX);
-                box.ymin = snap16(initialBoxCoords.ymin + coordDeltaY);
-            } else if (dragMode === 'sw') {
-                box.xmin = snap16(initialBoxCoords.xmin + coordDeltaX);
-                box.ymax = snap16(initialBoxCoords.ymax + coordDeltaY);
-            }
+                box.xmax = snapToGrid(initialBoxCoords.xmax + coordDeltaX, 'x');
+                box.ymax = snapToGrid(initialBoxCoords.ymax + coordDeltaY, 'y');
 
+            } else if (dragMode === 'nw') {
+                box.xmin = snapToGrid(initialBoxCoords.xmin + coordDeltaX, 'x');
+                box.ymin = snapToGrid(initialBoxCoords.ymin + coordDeltaY, 'y');
+
+            } else if (dragMode === 'ne') {
+                box.xmax = snapToGrid(initialBoxCoords.xmax + coordDeltaX, 'x');
+                box.ymin = snapToGrid(initialBoxCoords.ymin + coordDeltaY, 'y');
+
+            } else if (dragMode === 'sw') {
+                box.xmin = snapToGrid(initialBoxCoords.xmin + coordDeltaX, 'x');
+                box.ymax = snapToGrid(initialBoxCoords.ymax + coordDeltaY, 'y');
+            }
             window.renderCanvasBoxes();
             window.renderBoxesList();
             window.updateJSON();
@@ -2942,16 +2981,22 @@
                             e.preventDefault();
                             window.pushState();
                             const step = e.shiftKey ? 50 : 10;
+                            const multiplier = e.shiftKey ? 4 : 1;
+                            // Convert the selected pixel grid size into MOSS coordinates
+                            const stepX = (gridSize / canvasState.width) * 1000 * multiplier;
+                            const stepY = (gridSize / canvasState.height) * 1000 * multiplier;
                             if (e.altKey) {
-                                if (e.key === 'ArrowRight') box.xmax = Math.min(500, box.xmax + step);
-                                if (e.key === 'ArrowLeft') box.xmax = Math.max(box.xmin + 10, box.xmax - step);
-                                if (e.key === 'ArrowDown') box.ymax = Math.min(500, box.ymax + step);
-                                if (e.key === 'ArrowUp') box.ymax = Math.max(box.ymin + 10, box.ymax - step);
+                                // Resize the box
+                                if (e.key === 'ArrowRight') box.xmax = Math.min(500, box.xmax + stepX);
+                                if (e.key === 'ArrowLeft') box.xmax = Math.max(box.xmin + 10, box.xmax - stepX);
+                                if (e.key === 'ArrowDown') box.ymax = Math.min(500, box.ymax + stepY);
+                                if (e.key === 'ArrowUp') box.ymax = Math.max(box.ymin + 10, box.ymax - stepY);
                             } else {
-                                if (e.key === 'ArrowRight') { box.xmin += step; box.xmax += step; }
-                                if (e.key === 'ArrowLeft') { box.xmin -= step; box.xmax -= step; }
-                                if (e.key === 'ArrowDown') { box.ymin += step; box.ymax += step; }
-                                if (e.key === 'ArrowUp') { box.ymin -= step; box.ymax -= step; }
+                                // Move the entire box
+                                if (e.key === 'ArrowRight') { box.xmin += stepX; box.xmax += stepX; }
+                                if (e.key === 'ArrowLeft') { box.xmin -= stepX; box.xmax -= stepX; }
+                                if (e.key === 'ArrowDown') { box.ymin += stepY; box.ymax += stepY; }
+                                if (e.key === 'ArrowUp') { box.ymin -= stepY; box.ymax -= stepY; }
                             }
                             window.renderCanvasBoxes();
                             window.renderBoxesList();
